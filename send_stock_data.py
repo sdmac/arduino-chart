@@ -20,6 +20,12 @@ def parse_args():
                         type=str,
                         required=True,
                         help='the stock symbol')
+    parser.add_argument('--date',
+                        metavar='YYYY-MM-DD',
+                        dest='date',
+                        type=str,
+                        default='',
+                        help='the date')
     parser.add_argument('--interval',
                         metavar='STR',
                         dest='interval',
@@ -35,11 +41,14 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+def find_latest_weekday(date):
+    if date.isoweekday() > 5:
+        return (date - timedelta(date.isoweekday() - 5))
+    return date
+
 def find_prev_date(date):
     prev = date - timedelta(1)
-    if prev.isoweekday() > 5:
-        prev = prev - timedelta(prev.isoweekday() - 5)
-    return prev
+    return find_latest_weekday(prev)
 
 def get_data(token, symbol, date):
     return get_historical_intraday(symbol, date, token=token)
@@ -63,6 +72,17 @@ def to_minutes(s):
     else:
         return 1
 
+def determine_chart_date(args):
+    if args.date:
+        yr_mt_dy = args.date.split('-')
+        if len(yr_mt_dy) != 3:
+            raise RuntimeError('Cannot parse date: {}'.format(args.date))
+        return datetime(int(yr_mt_dy[0]),
+                        int(yr_mt_dy[1]),
+                        int(yr_mt_dy[2]))
+    else:
+        return datetime.today()
+
 def send_data(host, **kwargs):
     if len(kwargs) == 4:
         message = ('{p0},{date},{interval},{symbol}'
@@ -81,7 +101,7 @@ def send_data(host, **kwargs):
 
 args = parse_args()
 
-chart_date = datetime(2019, 8, 9)
+chart_date = find_latest_weekday(determine_chart_date(args))
 prev_date = find_prev_date(chart_date)
 
 init_price = get_initial_data(args.token, args.symbol, prev_date)
