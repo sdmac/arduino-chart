@@ -5,6 +5,7 @@ from iexfinance.stocks import get_historical_intraday, get_historical_data
 import argparse
 import requests
 import json
+import time
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Send stock data')
@@ -103,6 +104,7 @@ args = parse_args()
 
 chart_date = find_latest_weekday(determine_chart_date(args))
 prev_date = find_prev_date(chart_date)
+interval_mins = to_minutes(args.interval)
 
 init_price = get_initial_data(args.token, args.symbol, prev_date)
 send_data( args.host, **{
@@ -112,8 +114,15 @@ send_data( args.host, **{
     'symbol': args.symbol
 } )
 
+realtime = (chart_date == datetime.today())
+
 data = get_data(args.token, args.symbol, chart_date)
-for index in range(0, 390, to_minutes(args.interval)):
+
+for index in range(0, 390, interval_mins):
+    if realtime:
+        while len(data) < (index + 1):
+            time.sleep(60 * interval_mins)
+            data = get_data(args.token, args.symbol, chart_date)
     price = data[index]
     send_data(args.host,
               price=(price['close'] if price['close'] is not None
